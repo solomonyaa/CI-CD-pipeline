@@ -27,7 +27,7 @@ jobs:
         run: sleep 5
 
       - name: Run pytest
-        run: pytest test_scheduler.py -v
+        run: python -m pytest test_scheduler.py -v
 
       - name: Curl test - get all meetings
         run: curl -f http://localhost:5000/all
