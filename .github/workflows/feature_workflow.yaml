@@ -1,0 +1,59 @@
+name: Feature Branch Workflow
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!main'
+
+jobs:
+  build-run-pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Build image
+        run: docker build -t scheduler-api:v1 .
+
+      - name: Run a container
+        run: docker run -d -p 5000:5000 scheduler-api:v1
+
+      - name: Wait for container
+        run: sleep 5
+
+      - name: Run pytest
+        run: pytest test_scheduler.py -v
+
+      - name: Curl test - get all meetings
+        run: curl -f http://localhost:5000/all
+
+      - name: Curl test - get next meeting
+        run: curl -f http://localhost:5000/next
+
+      - name: Curl test - schedule valid meeting
+        run: |
+          curl -f -X POST http://localhost:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"CI Test","start":"06:00","duration":30}'
+
+      - name: Curl test - schedule conflicting meeting (expect 400)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Conflict","start":"13:30","duration":60}')
+          [ "$STATUS" -eq 400 ]
+
+      - name: Curl test - schedule invalid time (expect 400)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Bad","start":"25:00","duration":30}')
+          [ "$STATUS" -eq 400 ]
+
+      - name: Curl test - complete meeting
+        run: curl -f -X POST http://localhost:5000/complete
