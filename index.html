@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FocusFlow Scheduler</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-hover: #1c2129;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #f0883e;
+    --accent-glow: rgba(240, 136, 62, 0.15);
+    --success: #3fb950;
+    --error: #f85149;
+    --card-radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    position: relative;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 42px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--accent), #ffa657);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .tagline {
+    color: var(--text-muted);
+    font-weight: 300;
+    font-size: 15px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Layout */
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 28px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--accent);
+  }
+
+  .card-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title .icon {
+    width: 28px;
+    height: 28px;
+    background: var(--accent-glow);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  /* Next Meeting */
+  .next-meeting-display {
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .next-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .next-time {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--text-muted);
+  }
+
+  .next-time span {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus {
+    border-color: var(--accent);
+  }
+
+  .form-group input::placeholder {
+    color: #484f58;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 24px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: #ffa657;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px var(--accent-glow);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text-muted);
+    background: var(--surface-hover);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--error);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+  }
+
+  .btn-danger:hover {
+    background: rgba(248, 81, 73, 0.1);
+    border-color: var(--error);
+  }
+
+  /* Meeting List */
+  .meeting-list {
+    list-style: none;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .meeting-list::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .meeting-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .meeting-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .meeting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .meeting-item:last-child {
+    border-bottom: none;
+  }
+
+  .meeting-item:hover {
+    background: var(--surface-hover);
+  }
+
+  .meeting-info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .meeting-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .meeting-name {
+    font-weight: 500;
+    font-size: 15px;
+  }
+
+  .meeting-time {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Full width card */
+  .full-width {
+    grid-column: 1 / -1;
+  }
+
+  /* Actions row */
+  .actions-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 1000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .toast.success {
+    background: rgba(63, 185, 80, 0.15);
+    border: 1px solid rgba(63, 185, 80, 0.3);
+    color: var(--success);
+  }
+
+  .toast.error {
+    background: rgba(248, 81, 73, 0.15);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    color: var(--error);
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--text-muted);
+    font-weight: 300;
+  }
+
+  .empty-state .empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  /* Status indicator */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.offline {
+    background: var(--error);
+    animation: none;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">FocusFlow</div>
+    <div class="tagline">Meeting Scheduler</div>
+  </header>
+
+  <div style="text-align: center;">
+    <div class="status" id="status">
+      <span class="status-dot"></span>
+      <span>Connecting...</span>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- Next Meeting -->
+    <div class="card">
+      <div class="card-title"><span class="icon">▶</span> Up Next</div>
+      <div class="next-meeting-display" id="next-meeting">
+        <div class="empty-state">Loading...</div>
+      </div>
+      <button class="btn btn-danger" onclick="completeMeeting()" style="margin-top: 12px;">Complete Meeting</button>
+    </div>
+
+    <!-- Schedule Meeting -->
+    <div class="card">
+      <div class="card-title"><span class="icon">+</span> Schedule</div>
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" id="title" placeholder="Standup, Sprint Review...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="text" id="start" placeholder="14:00">
+        </div>
+        <div class="form-group">
+          <label>Duration (min)</label>
+          <input type="number" id="duration" placeholder="60">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="scheduleMeeting()">Schedule Meeting</button>
+    </div>
+
+    <!-- All Meetings -->
+    <div class="card full-width">
+      <div class="card-title"><span class="icon">☰</span> Today's Schedule</div>
+      <ul class="meeting-list" id="meeting-list">
+        <li class="empty-state">Loading...</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = window.location.origin;
+
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast ' + type + ' show';
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  function setStatus(online) {
+    const el = document.getElementById('status');
+    if (online) {
+      el.innerHTML = '<span class="status-dot"></span><span>Connected</span>';
+    } else {
+      el.innerHTML = '<span class="status-dot offline"></span><span>Offline</span>';
+    }
+  }
+
+  async function loadAll() {
+    try {
+      const res = await fetch(API + '/all');
+      const list = document.getElementById('meeting-list');
+
+      if (res.status === 404) {
+        list.innerHTML = '<li class="empty-state"><div class="empty-icon">✦</div>No meetings scheduled</li>';
+        setStatus(true);
+        return;
+      }
+
+      const data = await res.json();
+      setStatus(true);
+
+      if (data.length === 0) {
+        list.innerHTML = '<li class="empty-state"><div class="empty-icon">✦</div>No meetings scheduled</li>';
+        return;
+      }
+
+      list.innerHTML = data.map(m => `
+        <li class="meeting-item">
+          <div class="meeting-info">
+            <span class="meeting-dot"></span>
+            <span class="meeting-name">${m.title}</span>
+          </div>
+          <span class="meeting-time">${m.start} — ${m.end}</span>
+        </li>
+      `).join('');
+    } catch (e) {
+      setStatus(false);
+      document.getElementById('meeting-list').innerHTML =
+        '<li class="empty-state"><div class="empty-icon">⚠</div>Cannot reach server</li>';
+    }
+  }
+
+  async function loadNext() {
+    try {
+      const res = await fetch(API + '/next');
+      const el = document.getElementById('next-meeting');
+
+      if (res.status === 404) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">✦</div>All clear</div>';
+        return;
+      }
+
+      const data = await res.json();
+      el.innerHTML = `
+        <div class="next-title">${data.title}</div>
+        <div class="next-time"><span>${data.start}</span> — <span>${data.end}</span></div>
+      `;
+    } catch (e) {
+      document.getElementById('next-meeting').innerHTML =
+        '<div class="empty-state">Cannot load</div>';
+    }
+  }
+
+  async function scheduleMeeting() {
+    const title = document.getElementById('title').value.trim();
+    const start = document.getElementById('start').value.trim();
+    const duration = parseInt(document.getElementById('duration').value);
+
+    if (!title || !start || !duration) {
+      showToast('Please fill all fields', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(API + '/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, start, duration })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast(`Scheduled: ${data.title} at ${data.start}`);
+        document.getElementById('title').value = '';
+        document.getElementById('start').value = '';
+        document.getElementById('duration').value = '';
+        refresh();
+      } else {
+        showToast(data.error, 'error');
+      }
+    } catch (e) {
+      showToast('Failed to connect', 'error');
+    }
+  }
+
+  async function completeMeeting() {
+    try {
+      const res = await fetch(API + '/complete', { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok) {
+        showToast(`Completed: ${data.title}`);
+        refresh();
+      } else {
+        showToast(data.error, 'error');
+      }
+    } catch (e) {
+      showToast('Failed to connect', 'error');
+    }
+  }
+
+  function refresh() {
+    loadAll();
+    loadNext();
+  }
+
+  refresh();
+</script>
+
+</body>
+</html>
