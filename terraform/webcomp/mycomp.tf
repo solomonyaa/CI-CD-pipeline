@@ -44,11 +44,11 @@ resource "aws_instance" "ec2-1" {
 
   user_data = <<-EOF
     #!/bin/bash
-    yum install -y docker
+    dnf install -y docker
     systemctl start docker
     systemctl enable docker
-    docker pull solomony/scheduler-api:latest
-    docker run -d -p 5000:5000 solomony/scheduler-api:latest
+    docker pull solomony/scheduler-api:v1
+    docker run -d -p 5000:5000 solomony/scheduler-api:v1
   EOF
 
   tags = { Name = "CI-CD server" }
