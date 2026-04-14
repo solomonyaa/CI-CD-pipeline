@@ -7,7 +7,7 @@ Constraints:
 - All times are in 24-hour HH:MM format
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from Meeting_Module import Meeting
 import heapq
 
@@ -91,6 +91,9 @@ def get_all_meetings():
 
     return jsonify(all_meetings), 200
 
+@app.route('/')
+def index():
+    return send_file('index.html')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
