@@ -1,0 +1,93 @@
+name: Main Branch Workflow
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+jobs:
+  on-merge:
+    # Use this 'if' check to run logic ONLY when the PR was merged
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: python -m pytest test_scheduler.py -v
+
+      - name: Login to Docker Hub
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/scheduler-api:v1 .
+
+      - name: Push the image to dockerhub
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/scheduler-api:v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform init
+        run: terraform init
+        working-directory: ./terraform
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve
+        working-directory: ./terraform
+
+      - name: Get EC2 IP
+        id: get-ip
+        run: echo "EC2_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+
+      - name: Wait for EC2 to boot
+        run: sleep 60
+
+      - name: Curl test - get all meetings
+        run: curl -f http://${{ steps.get-ip.outputs.EC2_IP }}:5000/all
+
+      - name: Curl test - get next meeting
+        run: curl -f http://${{ steps.get-ip.outputs.EC2_IP }}:5000/next
+
+      - name: Curl test - schedule valid meeting
+        run: |
+          curl -f -X POST http://${{ steps.get-ip.outputs.EC2_IP }}:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"CI Test","start":"06:00","duration":30}'
+
+      - name: Curl test - schedule conflicting meeting (expect 400)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://${{ steps.get-ip.outputs.EC2_IP }}:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Conflict","start":"13:30","duration":60}')
+          [ "$STATUS" -eq 400 ]
+
+      - name: Curl test - schedule invalid time (expect 400)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://${{ steps.get-ip.outputs.EC2_IP }}:5000/schedule \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Bad","start":"25:00","duration":30}')
+          [ "$STATUS" -eq 400 ]
+
+      - name: Curl test - complete meeting
+        run: curl -f -X POST http://${{ steps.get-ip.outputs.EC2_IP }}:5000/complete
